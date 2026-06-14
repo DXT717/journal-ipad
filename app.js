@@ -65,6 +65,8 @@ const pencilDialog = document.querySelector("#pencilDialog");
 const pencilText = document.querySelector("#pencilText");
 const sketchCanvas = document.querySelector("#sketchCanvas");
 const sketchContext = sketchCanvas.getContext("2d");
+const deleteDialog = document.querySelector("#deleteDialog");
+const deleteSummary = document.querySelector("#deleteSummary");
 let isSketching = false;
 let lastPoint = null;
 
@@ -165,6 +167,37 @@ function renderList() {
     button.append(title, meta);
     entryList.append(button);
   });
+}
+
+function deleteCurrentEntry() {
+  const entry = currentEntry();
+  if (!entry) return;
+
+  state.entries = state.entries.filter((item) => item.id !== entry.id);
+  if (!state.entries.length) {
+    createEntry();
+    return;
+  }
+
+  state.currentId = state.entries[0].id;
+  state.selectedTags = new Set();
+  persist();
+  loadCurrentEntry();
+  renderList();
+}
+
+function openDeleteDialog() {
+  saveCurrentEntry();
+  const entry = currentEntry();
+  if (!entry) return;
+
+  const date = new Date(entry.createdAt).toLocaleDateString(undefined, {
+    month: "long",
+    day: "numeric"
+  });
+  const title = entry.text.trim().split(/\s+/).slice(0, 8).join(" ") || "Untitled entry";
+  deleteSummary.textContent = `Delete "${title}" from ${date}? This cannot be undone.`;
+  deleteDialog.showModal();
 }
 
 function updateTagButtons() {
@@ -447,6 +480,11 @@ document.querySelector("#saveButton").addEventListener("click", saveCurrentEntry
 document.querySelector("#replyButton").addEventListener("click", generateReply);
 document.querySelector("#exportButton").addEventListener("click", exportEntries);
 document.querySelector("#promptButton").addEventListener("click", () => promptDialog.showModal());
+document.querySelector("#deleteButton").addEventListener("click", openDeleteDialog);
+document.querySelector("#confirmDeleteButton").addEventListener("click", () => {
+  deleteCurrentEntry();
+  deleteDialog.close();
+});
 function openPencilInput() {
   saveCurrentEntry();
   pencilDialog.showModal();

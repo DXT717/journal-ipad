@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-title" content="Inner Room" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Inner Room Journal</title>
-    <link rel="manifest" href="manifest.webmanifest?v=4" />
+    <link rel="manifest" href="manifest.webmanifest?v=5" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=4" />
+    <link rel="stylesheet" href="styles.css?v=5" />
   </head>
   <body>
     <main class="app-shell">
@@ -51,6 +51,7 @@
           <div class="topbar-actions">
             <button class="ghost-button" id="pencilButton" type="button">Pencil</button>
             <button class="ghost-button" id="promptButton" type="button">Prompt</button>
+            <button class="danger-button" id="deleteButton" type="button">Delete</button>
             <button class="save-button" id="saveButton" type="button">Save</button>
           </div>
         </header>
@@ -135,7 +136,23 @@
       </form>
     </dialog>
 
-    <script src="app.js?v=4"></script>
+    <dialog id="deleteDialog" class="confirm-dialog">
+      <form method="dialog">
+        <div class="dialog-head">
+          <h3>Delete entry?</h3>
+          <button class="icon-button" value="cancel" aria-label="Close" title="Close">X</button>
+        </div>
+        <div class="confirm-body">
+          <p id="deleteSummary">This journal entry will be permanently deleted from this device.</p>
+          <div class="confirm-actions">
+            <button class="ghost-button" value="cancel" type="submit">Cancel</button>
+            <button class="danger-button" id="confirmDeleteButton" value="delete" type="button">Delete entry</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js?v=5"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         navigator.serviceWorker.register("sw.js");
