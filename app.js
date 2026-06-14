@@ -477,6 +477,10 @@ document.querySelector("#newEntryButton").addEventListener("click", () => {
 });
 
 document.querySelector("#saveButton").addEventListener("click", saveCurrentEntry);
+document.querySelector("#refreshButton").addEventListener("click", () => {
+  saveCurrentEntry();
+  location.reload();
+});
 document.querySelector("#replyButton").addEventListener("click", generateReply);
 document.querySelector("#exportButton").addEventListener("click", exportEntries);
 document.querySelector("#promptButton").addEventListener("click", () => promptDialog.showModal());
