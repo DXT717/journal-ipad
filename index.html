@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-title" content="Inner Room" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Inner Room Journal</title>
-    <link rel="manifest" href="manifest.webmanifest?v=6" />
+    <link rel="manifest" href="manifest.webmanifest?v=13" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=6" />
+    <link rel="stylesheet" href="styles.css?v=13" />
   </head>
   <body>
     <main class="app-shell">
@@ -28,9 +28,17 @@
           <span aria-hidden="true">+</span>
           New entry
         </button>
-        <button class="secondary-action" id="sidebarPencilButton" type="button">
-          <span aria-hidden="true">P</span>
-          Pencil input
+        <button class="secondary-action" id="valuesButton" type="button">
+          <span aria-hidden="true">V</span>
+          Values
+        </button>
+        <button class="secondary-action" id="growthButton" type="button">
+          <span aria-hidden="true">G</span>
+          Growth
+        </button>
+        <button class="secondary-action" id="cbtButton" type="button">
+          <span aria-hidden="true">C</span>
+          CBT record
         </button>
 
         <div class="history-header">
@@ -50,7 +58,6 @@
           </div>
           <div class="topbar-actions">
             <button class="ghost-button" id="refreshButton" type="button" title="Refresh" aria-label="Refresh app">Refresh</button>
-            <button class="ghost-button" id="pencilButton" type="button">Pencil</button>
             <button class="ghost-button" id="promptButton" type="button">Prompt</button>
             <button class="danger-button" id="deleteButton" type="button">Delete</button>
             <button class="save-button" id="saveButton" type="button">Save</button>
@@ -59,10 +66,9 @@
 
         <div class="editor-layout">
           <article class="writing-area">
-            <div class="mood-row">
-              <label for="moodRange">Mood</label>
-              <input id="moodRange" type="range" min="1" max="10" value="5" />
-              <output id="moodValue" for="moodRange">5</output>
+            <div class="mood-picker" aria-labelledby="moodPickerLabel">
+              <div class="field-label" id="moodPickerLabel">Mood</div>
+              <div class="mood-quadrants" id="moodOptions" role="listbox" aria-label="Choose a mood"></div>
             </div>
 
             <label class="field-label" for="entryText">What is present for you?</label>
@@ -111,32 +117,6 @@
       </form>
     </dialog>
 
-    <dialog id="pencilDialog" class="pencil-dialog">
-      <form method="dialog">
-        <div class="dialog-head">
-          <h3>Pencil input</h3>
-          <button class="icon-button" value="cancel" aria-label="Close" title="Close">X</button>
-        </div>
-        <div class="pencil-grid">
-          <section class="pencil-section">
-            <div class="section-head">
-              <label for="pencilText">Handwriting</label>
-              <button class="ghost-button compact" id="insertPencilText" type="button">Insert</button>
-            </div>
-            <textarea id="pencilText" class="pencil-text" spellcheck="true" autocomplete="off" inputmode="text"></textarea>
-          </section>
-
-          <section class="pencil-section">
-            <div class="section-head">
-              <span>Sketch</span>
-              <button class="ghost-button compact" id="clearSketch" type="button">Clear</button>
-            </div>
-            <canvas id="sketchCanvas" width="900" height="520" aria-label="Sketch pad"></canvas>
-          </section>
-        </div>
-      </form>
-    </dialog>
-
     <dialog id="deleteDialog" class="confirm-dialog">
       <form method="dialog">
         <div class="dialog-head">
@@ -153,7 +133,59 @@
       </form>
     </dialog>
 
-    <script src="app.js?v=6"></script>
+    <dialog id="valuesDialog" class="values-dialog">
+      <form method="dialog">
+        <div class="dialog-head">
+          <h3 id="valuesTitle">Values</h3>
+          <button class="icon-button" value="cancel" aria-label="Close" title="Close">X</button>
+        </div>
+        <div class="values-body">
+          <div class="values-card" id="valuesPrompt"></div>
+          <textarea id="valuesInput" class="values-input" spellcheck="true"></textarea>
+          <div class="values-actions">
+            <button class="ghost-button" id="weeklyValuesButton" type="button">Weekly</button>
+            <button class="ghost-button" id="dailyValuesButton" type="button">Daily</button>
+            <button class="save-button" id="valuesNextButton" type="button">Continue</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="growthDialog" class="values-dialog">
+      <form method="dialog">
+        <div class="dialog-head">
+          <h3 id="growthTitle">Growth</h3>
+          <button class="icon-button" value="cancel" aria-label="Close" title="Close">X</button>
+        </div>
+        <div class="values-body">
+          <div class="values-card" id="growthPrompt"></div>
+          <textarea id="growthInput" class="values-input" spellcheck="true"></textarea>
+          <div class="values-actions">
+            <button class="ghost-button" id="monthlyGrowthButton" type="button">Report</button>
+            <button class="ghost-button" id="dailyGrowthButton" type="button">Daily</button>
+            <button class="save-button" id="growthNextButton" type="button">Continue</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="cbtDialog" class="values-dialog">
+      <form method="dialog">
+        <div class="dialog-head">
+          <h3 id="cbtTitle">CBT thought record</h3>
+          <button class="icon-button" value="cancel" aria-label="Close" title="Close">X</button>
+        </div>
+        <div class="values-body">
+          <div class="values-card" id="cbtPrompt"></div>
+          <textarea id="cbtInput" class="values-input" spellcheck="true"></textarea>
+          <div class="values-actions single-action">
+            <button class="save-button" id="cbtNextButton" type="button">Continue</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js?v=13"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         navigator.serviceWorker.register("sw.js");
