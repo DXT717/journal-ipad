@@ -1,6 +1,10 @@
 const STORAGE_KEY = "inner-room-journal-v1";
 const VALUES_KEY = "inner-room-values-v1";
 const GROWTH_KEY = "inner-room-growth-v1";
+const CBT_KEY = "inner-room-cbt-v1";
+const COMPANION_KEY = "inner-room-companion-v1";
+const sketchColors = ["#20242b", "#c66a54", "#d5a642", "#35695a", "#486c97", "#7b4fa3"];
+let companionExamples = [];
 
 const prompts = [
   "What feeling has been asking for more space today?",
@@ -156,7 +160,10 @@ const state = {
   growthDraft: {},
   cbtMode: "home",
   cbtStep: 0,
-  cbtDraft: {}
+  cbtDraft: {},
+  cbtProfile: null,
+  companionProfile: null,
+  pendingDailySketch: ""
 };
 
 const entryList = document.querySelector("#entryList");
@@ -188,6 +195,10 @@ const cbtTitle = document.querySelector("#cbtTitle");
 const cbtPrompt = document.querySelector("#cbtPrompt");
 const cbtInput = document.querySelector("#cbtInput");
 const cbtNextButton = document.querySelector("#cbtNextButton");
+const entrySketchPad = createSketchPad(document.querySelector("#entrySketchCanvas"));
+const valuesSketchPad = createSketchPad(document.querySelector("#valuesSketchCanvas"));
+const growthSketchPad = createSketchPad(document.querySelector("#growthSketchCanvas"));
+const cbtSketchPad = createSketchPad(document.querySelector("#cbtSketchCanvas"));
 
 function loadEntries() {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -209,12 +220,14 @@ function loadValuesProfile() {
     answers: {},
     coreValues: [],
     dailyCheckIns: [],
+    sketches: {},
     lastDailyPromptDate: "",
     lastWeeklyReflectionDate: ""
   };
   state.valuesProfile.answers ||= {};
   state.valuesProfile.coreValues ||= [];
   state.valuesProfile.dailyCheckIns ||= [];
+  state.valuesProfile.sketches ||= {};
   state.valuesProfile.lastDailyPromptDate ||= "";
   state.valuesProfile.lastWeeklyReflectionDate ||= "";
 }
@@ -239,6 +252,41 @@ function saveGrowthProfile() {
   localStorage.setItem(GROWTH_KEY, JSON.stringify(state.growthProfile));
 }
 
+function loadCbtProfile() {
+  const raw = localStorage.getItem(CBT_KEY);
+  state.cbtProfile = raw ? JSON.parse(raw) : { records: [] };
+  state.cbtProfile.records ||= [];
+}
+
+function saveCbtProfile() {
+  localStorage.setItem(CBT_KEY, JSON.stringify(state.cbtProfile));
+}
+
+function loadCompanionProfile() {
+  const raw = localStorage.getItem(COMPANION_KEY);
+  state.companionProfile = raw ? JSON.parse(raw) : { askedQuestions: [], facts: [], values: [], patterns: [], moodTrend: [], important: [] };
+  state.companionProfile.askedQuestions ||= [];
+  state.companionProfile.facts ||= [];
+  state.companionProfile.values ||= [];
+  state.companionProfile.patterns ||= [];
+  state.companionProfile.moodTrend ||= [];
+  state.companionProfile.important ||= [];
+}
+
+function saveCompanionProfile() {
+  localStorage.setItem(COMPANION_KEY, JSON.stringify(state.companionProfile));
+}
+
+async function loadCompanionExamples() {
+  try {
+    const response = await fetch("training_data.json?v=16", { cache: "no-store" });
+    if (!response.ok) return;
+    companionExamples = await response.json();
+  } catch {
+    companionExamples = [];
+  }
+}
+
 function persist() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.entries));
 }
@@ -253,7 +301,8 @@ function createEntry() {
     moodKey: "calm",
     text: "",
     tags: [],
-    reply: ""
+    reply: "",
+    sketch: ""
   };
   state.entries.unshift(entry);
   state.currentId = entry.id;
@@ -304,6 +353,7 @@ function loadCurrentEntry() {
   state.selectedTags = new Set(entry.tags);
   updateTagButtons();
   renderReply(entry.reply);
+  entrySketchPad.load(entry.sketch);
 }
 
 function saveCurrentEntry() {
@@ -313,6 +363,7 @@ function saveCurrentEntry() {
   entry.moodKey = state.selectedMood;
   entry.mood = moodFromKey(state.selectedMood).tone;
   entry.tags = [...state.selectedTags];
+  entry.sketch = entrySketchPad.data();
   entry.updatedAt = new Date().toISOString();
   persist();
   loadCurrentEntry();
@@ -496,6 +547,179 @@ function containsCrisisLanguage(text) {
   ].some((phrase) => text.includes(phrase));
 }
 
+function recentEntryContext(entry) {
+  return state.entries
+    .filter((item) => item.id !== entry.id && item.text)
+    .slice(0, 5);
+}
+
+function includesAny(text, words) {
+  return words.some((word) => text.includes(word));
+}
+
+function wordsFrom(text) {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s']/g, " ")
+      .split(/\s+/)
+      .filter((word) => word.length > 3)
+  );
+}
+
+function detectMoodForExamples(entry, signal) {
+  const mood = moodFromKey(entry.moodKey).label.toLowerCase();
+  if (["sad", "lonely", "ashamed", "numb"].includes(entry.moodKey)) return "sad";
+  if (["anxious", "stressed", "overwhelmed"].includes(entry.moodKey)) return "anxious";
+  if (["angry", "frustrated"].includes(entry.moodKey)) return "angry";
+  if (["tired"].includes(entry.moodKey)) return "burned out";
+  if (["happy", "hopeful", "grateful", "proud", "excited", "peaceful", "loved", "calm", "playful"].includes(entry.moodKey)) return "happy";
+  if (signal === "values") return "lost";
+  return mood || "lost";
+}
+
+function findCompanionExample(entry, signal) {
+  if (!companionExamples.length) return null;
+  const targetMood = detectMoodForExamples(entry, signal);
+  const entryWords = wordsFrom(entry.text);
+  const pool = companionExamples.filter((example) => example.mood === targetMood);
+  const candidates = pool.length ? pool : companionExamples;
+
+  return candidates
+    .map((example) => {
+      const exampleWords = wordsFrom(example.entry);
+      let overlap = 0;
+      entryWords.forEach((word) => {
+        if (exampleWords.has(word)) overlap += 1;
+      });
+      return { example, overlap };
+    })
+    .sort((a, b) => b.overlap - a.overlap)[0]?.example || null;
+}
+
+function splitExampleReply(reply) {
+  const parts = reply.match(/[^.!?]+[.!?]/g)?.map((part) => part.trim()) || [reply.trim()];
+  const question = parts.find((part) => part.endsWith("?")) || "What feels most important to understand about this?";
+  const statements = parts.filter((part) => !part.endsWith("?"));
+  return {
+    opening: statements[0] || "This sounds like it mattered more than you wanted it to.",
+    middle: statements[1] || "There may be something here worth meeting with more gentleness.",
+    question
+  };
+}
+
+function selectFreshQuestion(candidates) {
+  const asked = state.companionProfile.askedQuestions;
+  const question = candidates.find((item) => !asked.includes(item)) || candidates[candidates.length - 1];
+  asked.push(question);
+  state.companionProfile.askedQuestions = asked.slice(-80);
+  saveCompanionProfile();
+  return question;
+}
+
+function inferCompanionSignal(text) {
+  if (includesAny(text, ["failed", "failure", "mistake", "messed up", "not good enough", "stupid", "can't do", "cannot do"])) {
+    return "growth";
+  }
+  if (includesAny(text, ["lost", "conflicted", "don't know what i want", "do not know what i want", "meaning", "what matters", "purpose", "stuck"])) {
+    return "values";
+  }
+  if (includesAny(text, ["always", "never", "everyone", "nothing", "everything", "should", "must", "worst", "my fault", "they think"])) {
+    return "thought";
+  }
+  return "feeling";
+}
+
+function recurringPattern(entry, context) {
+  const current = entry.text.toLowerCase();
+  const recent = context.map((item) => item.text.toLowerCase()).join(" ");
+  const emotions = rankedMatches(current, emotionLexicon);
+  const top = emotions[0]?.name;
+  if (top && countMatches(recent, emotionLexicon[top]) > 1) {
+    return `This seems connected to a feeling that has visited more than once lately: ${top}.`;
+  }
+  const needs = rankedMatches(current, needLexicon);
+  const need = needs[0]?.name;
+  if (need && countMatches(recent, needLexicon[need]) > 1) {
+    return `There may be a repeated pull toward ${need} showing up across your recent entries.`;
+  }
+  return "";
+}
+
+function updateCompanionMemory(entry) {
+  const text = entry.text.toLowerCase();
+  const profile = state.companionProfile;
+  const factPatterns = [
+    /\bmy (mom|mother|dad|father|partner|boyfriend|girlfriend|husband|wife|friend|boss|manager|coworker|colleague|sister|brother)\b[^.!?]{0,90}/gi,
+    /\bi (work|worked|study|studied|live|lived|moved|commute|teach|manage|care for)\b[^.!?]{0,90}/gi
+  ];
+  factPatterns.forEach((pattern) => {
+    (entry.text.match(pattern) || []).slice(0, 2).forEach((match) => profile.facts.push(match.trim()));
+  });
+  Object.keys(valueWords).forEach((value) => {
+    if (countMatches(text, valueWords[value]) > 0) profile.values.push(value);
+  });
+  profile.patterns.push(inferCompanionSignal(text));
+  profile.moodTrend.push(moodFromKey(entry.moodKey).label);
+  const important = sentenceFromEntry(entry.text);
+  if (important) profile.important.push(important.replace(/^One line stands out to me: "/, "").replace(/\."$/, ""));
+  profile.facts = [...new Set(profile.facts)].slice(-30);
+  profile.values = [...new Set(profile.values)].slice(-12);
+  profile.patterns = profile.patterns.slice(-20);
+  profile.moodTrend = profile.moodTrend.slice(-10);
+  profile.important = profile.important.slice(-10);
+  saveCompanionProfile();
+}
+
+function memoryNudge() {
+  const profile = state.companionProfile;
+  const fact = profile.facts?.slice(-1)[0];
+  const important = profile.important?.slice(-1)[0];
+  if (fact && profile.facts.length % 3 === 0) return `Also, the bit about ${fact} feels connected to things you've mentioned before.`;
+  if (important && profile.important.length % 4 === 0) return `That line about "${important}" feels like it has a little bell around it.`;
+  return "";
+}
+
+function aliveDetail(entry) {
+  const sentences = entry.text
+    .split(/[.!?]/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 18);
+  return sentences.sort((a, b) => {
+    const aScore = (a.match(/\b(when|said|looked|sat|smiled|text|call|room|door|table|laugh|quiet|wait)\b/gi) || []).length;
+    const bScore = (b.match(/\b(when|said|looked|sat|smiled|text|call|room|door|table|laugh|quiet|wait)\b/gi) || []).length;
+    return bScore - aScore;
+  })[0] || entry.text.trim().split(/\s+/).slice(0, 12).join(" ");
+}
+
+function curiousQuestion(entry, signal) {
+  const detail = aliveDetail(entry);
+  const shortDetail = detail.length > 82 ? `${detail.slice(0, 79)}...` : detail;
+  const banks = {
+    growth: [
+      `Wait, when ${shortDetail}, what was the tiny brave part of you doing?`,
+      "What was the little part of you that kept going, even there?",
+      "If that hard moment had a tiny sign on it, what would the sign say?"
+    ],
+    values: [
+      "What feels more like you here, even if it is a bit scary?",
+      "If nobody got to vote on your answer, what would you secretly pick?",
+      "Which part feels like yours, and which part feels like it got handed to you by other people?"
+    ],
+    thought: [
+      "When that thought popped up, what happened right before it?",
+      "What made that thought look so true for a minute?",
+      "If that thought is only one guess, what is another guess hiding nearby?"
+    ],
+    feeling: [
+      "What was the exact tiny moment when the feeling changed?",
+      `What part of "${shortDetail}" keeps doing a little replay in your head?`,
+      "What do you wish someone had noticed right then?"
+    ]
+  };
+  return selectFreshQuestion(banks[signal]);
+}
+
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -544,6 +768,8 @@ function setValuesPrompt(title, lines, buttonText = "Continue", showInput = true
   });
   valuesInput.value = "";
   valuesInput.hidden = !showInput;
+  valuesSketchPad.clear();
+  document.querySelector("#valuesSketchCanvas").closest(".sketch-block").hidden = !showInput;
   valuesNextButton.textContent = buttonText;
   dailyValuesButton.hidden = !state.valuesProfile.complete;
   weeklyValuesButton.hidden = !state.valuesProfile.complete;
@@ -568,6 +794,7 @@ function renderValuesOnboarding() {
 function continueValuesOnboarding() {
   const area = valueAreas[state.valuesStep];
   state.valuesProfile.answers[area.key] = valuesInput.value.trim();
+  state.valuesProfile.sketches[area.key] = valuesSketchPad.data();
   state.valuesStep += 1;
 
   if (state.valuesStep < valueAreas.length) {
@@ -602,6 +829,7 @@ function openDailyValuesCheckIn() {
 function continueDailyValuesCheckIn() {
   if (state.valuesMode === "daily-1") {
     state.pendingDailyAnswer = valuesInput.value.trim();
+    state.pendingDailySketch = valuesSketchPad.data();
     const neglected = mostNeglectedValue(state.pendingDailyAnswer);
     state.valuesMode = "daily-2";
     setValuesPrompt("Daily values check-in", [
@@ -617,7 +845,9 @@ function continueDailyValuesCheckIn() {
   state.valuesProfile.dailyCheckIns.push({
     date: todayKey(),
     answer: state.pendingDailyAnswer,
+    answerSketch: state.pendingDailySketch,
     nextAction: action,
+    nextActionSketch: valuesSketchPad.data(),
     neglected
   });
   saveValuesProfile();
@@ -707,6 +937,8 @@ function setGrowthPrompt(title, lines, buttonText = "Continue", showInput = true
   });
   growthInput.value = "";
   growthInput.hidden = !showInput;
+  growthSketchPad.clear();
+  document.querySelector("#growthSketchCanvas").closest(".sketch-block").hidden = !showInput;
   growthNextButton.textContent = buttonText;
 }
 
@@ -753,6 +985,7 @@ function continueDailyGrowthReflection() {
   const answer = growthInput.value.trim();
   if (state.growthStep === 0) {
     state.growthDraft.struggle = answer;
+    state.growthDraft.struggleSketch = growthSketchPad.data();
     state.growthStep = 1;
     renderDailyGrowthStep();
     growthInput.focus();
@@ -760,6 +993,7 @@ function continueDailyGrowthReflection() {
   }
   if (state.growthStep === 1) {
     state.growthDraft.learning = answer;
+    state.growthDraft.learningSketch = growthSketchPad.data();
     state.growthStep = 2;
     renderDailyGrowthStep();
     growthInput.focus();
@@ -767,12 +1001,18 @@ function continueDailyGrowthReflection() {
   }
 
   state.growthDraft.nextStep = answer;
+  state.growthDraft.nextStepSketch = growthSketchPad.data();
   const entry = {
     date: todayKey(),
     createdAt: new Date().toISOString(),
     struggle: state.growthDraft.struggle || "",
     learning: state.growthDraft.learning || "",
-    nextStep: state.growthDraft.nextStep || ""
+    nextStep: state.growthDraft.nextStep || "",
+    sketches: {
+      struggle: state.growthDraft.struggleSketch || "",
+      learning: state.growthDraft.learningSketch || "",
+      nextStep: state.growthDraft.nextStepSketch || ""
+    }
   };
   state.growthProfile.entries.push(entry);
   saveGrowthProfile();
@@ -880,6 +1120,8 @@ function setCbtPrompt(title, lines, buttonText = "Continue", showInput = true) {
   });
   cbtInput.value = "";
   cbtInput.hidden = !showInput;
+  cbtSketchPad.clear();
+  document.querySelector("#cbtSketchCanvas").closest(".sketch-block").hidden = !showInput;
   cbtNextButton.textContent = buttonText;
 }
 
@@ -933,6 +1175,7 @@ function continueCbtRecord() {
   const answer = cbtInput.value.trim();
   const keys = ["situation", "emotion", "thought", "distortion", "reframe", "rerate"];
   state.cbtDraft[keys[state.cbtStep]] = answer;
+  state.cbtDraft[`${keys[state.cbtStep]}Sketch`] = cbtSketchPad.data();
   state.cbtStep += 1;
 
   if (state.cbtStep < keys.length) {
@@ -947,45 +1190,50 @@ function continueCbtRecord() {
   ];
   setCbtPrompt("CBT thought record", summary, "Close", false);
   state.cbtMode = "summary";
+  state.cbtProfile.records.push({
+    date: todayKey(),
+    createdAt: new Date().toISOString(),
+    ...state.cbtDraft
+  });
+  saveCbtProfile();
 }
 
 function buildSupportiveReflection(entry) {
   const text = entry.text.toLowerCase();
   if (containsCrisisLanguage(text)) {
-    return "I am really glad you wrote this down. This sounds like a moment that deserves immediate human support, not just a journal reply.\n\nIf you might hurt yourself or someone else, please contact local emergency services now. If you are in the United States, call or text 988 for the Suicide and Crisis Lifeline. If you are elsewhere, contact your local emergency number or a trusted person who can stay with you.\n\nFor the next minute, move away from anything you could use to hurt yourself and put one real person between you and being alone with this.";
+    return "That sounds really scary and lonely to hold by yourself.\n\nPlease tell someone you trust or a professional now, and call emergency help if you might hurt yourself or someone else.\n\nCould you message one safe person before you stay with this alone?";
   }
 
   const emotions = rankedMatches(text, emotionLexicon);
-  const needs = rankedMatches(text, needLexicon);
   const mainEmotion = emotions[0]?.name || "mixed";
-  const mainNeed = needs[0]?.name;
-  const selectedMood = moodFromKey(entry.moodKey);
+  const signal = inferCompanionSignal(text);
 
   const emotionLines = {
-    anxious: "I hear a part of you trying to scan ahead and protect you from something painful.",
-    sad: "I hear sadness asking to be witnessed rather than rushed away.",
-    angry: "I hear anger pointing toward something that mattered or felt crossed.",
-    ashamed: "I hear a harsh inner voice trying to make this mean something global about you.",
-    tender: "I hear tenderness here, which usually means something important is close to the surface.",
-    hopeful: "I hear a thread of hope or steadiness in this, even if the situation is still complicated.",
-    mixed: "I hear more than one feeling moving at the same time, which makes sense for a layered moment."
+    anxious: "Whoa, that worry sounds like it kept poking you, even when you were just trying to have a normal day.",
+    sad: "Oh, that sounds like a heavy kind of sad, the kind that just sits next to you and will not leave.",
+    angry: "Wait, that sounds so frustrating, like you had to keep your face normal while the inside of you was yelling.",
+    ashamed: "Oof, that sounds like it went straight to the mean little voice that says unfair things about you.",
+    tender: "That tiny detail feels really soft, like it mattered before you even knew it mattered.",
+    hopeful: "Oh, that little bright part is interesting, like a tiny light showed up and you actually saw it.",
+    mixed: "It sounds like a bunch of little inside-voices all tried to talk at the same time."
   };
 
-  const needQuestions = {
-    safety: "What would help your body feel even 10 percent safer right now?",
-    clarity: "What do you know for sure, and what are you still guessing?",
-    connection: "Who could receive a small honest piece of this from you?",
-    rest: "What would rest look like if it did not have to be earned first?",
-    boundaries: "Where might a small boundary protect your energy or dignity?",
-    agency: "What is one small choice still available to you?"
+  const secondLines = {
+    growth: "It does not sound like a fail; it sounds like one of those hard bits where your brain is secretly learning, even if it feels awful.",
+    values: "It feels like there is a small hidden compass in here, trying to point at what is really yours.",
+    thought: "One thought in here got very loud, like it climbed onto a chair and shouted over everything else.",
+    feeling: "The feeling has a shape, almost like it started as one tiny pebble and then became a whole hill."
   };
+  const memory = memoryNudge();
+  const question = curiousQuestion(entry, signal);
+  updateCompanionMemory(entry);
 
   return [
     emotionLines[mainEmotion],
-    `You selected ${selectedMood.label.toLowerCase()}, so I would start by respecting that signal instead of trying to solve everything immediately.`,
-    mainNeed ? `A possible need underneath this is ${mainNeed}.` : "The need underneath this may not be clear yet, and that is okay.",
-    `A question to sit with: ${needQuestions[mainNeed] || "Which part of this wants your attention first?"}`
-  ].join("\n\n");
+    secondLines[signal],
+    memory,
+    question
+  ].filter(Boolean).slice(0, 3).join("\n\n");
 }
 
 function generateReply() {
@@ -1013,6 +1261,118 @@ function exportEntries() {
   link.download = "inner-room-journal.json";
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function createSketchPad(canvas) {
+  const context = canvas.getContext("2d");
+  const pad = {
+    canvas,
+    context,
+    color: sketchColors[0],
+    drawing: false,
+    point: null,
+    clear() {
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.lineWidth = 5;
+      context.lineCap = "round";
+      context.lineJoin = "round";
+    },
+    data() {
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let index = 0; index < pixels.length; index += 4) {
+        if (pixels[index] < 245 || pixels[index + 1] < 245 || pixels[index + 2] < 245) {
+          return canvas.toDataURL("image/png");
+        }
+      }
+      return "";
+    },
+    load(dataUrl) {
+      pad.clear();
+      if (!dataUrl) return;
+      const image = new Image();
+      image.addEventListener("load", () => {
+        pad.clear();
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      });
+      image.src = dataUrl;
+    },
+    eventPoint(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: ((event.clientX - rect.left) / rect.width) * canvas.width,
+        y: ((event.clientY - rect.top) / rect.height) * canvas.height
+      };
+    }
+  };
+
+  canvas.addEventListener("pointerdown", (event) => {
+    pad.drawing = true;
+    pad.point = pad.eventPoint(event);
+    canvas.setPointerCapture(event.pointerId);
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    if (!pad.drawing || !pad.point) return;
+    const point = pad.eventPoint(event);
+    context.strokeStyle = pad.color;
+    context.beginPath();
+    context.moveTo(pad.point.x, pad.point.y);
+    context.lineTo(point.x, point.y);
+    context.stroke();
+    pad.point = point;
+  });
+  ["pointerup", "pointercancel", "pointerleave"].forEach((type) => {
+    canvas.addEventListener(type, () => {
+      pad.drawing = false;
+      pad.point = null;
+      if (canvas.id === "entrySketchCanvas") saveCurrentEntry();
+    });
+  });
+
+  pad.clear();
+  return pad;
+}
+
+function buildSketchTools() {
+  const pads = {
+    entrySketchCanvas: entrySketchPad,
+    valuesSketchCanvas: valuesSketchPad,
+    growthSketchCanvas: growthSketchPad,
+    cbtSketchCanvas: cbtSketchPad
+  };
+
+  document.querySelectorAll(".sketch-tools").forEach((container) => {
+    const pad = pads[container.dataset.toolsFor];
+    if (!pad) return;
+    container.innerHTML = "";
+
+    sketchColors.forEach((color) => {
+      const button = document.createElement("button");
+      button.className = `color-tool${color === pad.color ? " selected" : ""}`;
+      button.type = "button";
+      button.style.backgroundColor = color;
+      button.title = "Pen color";
+      button.setAttribute("aria-label", `Pen color ${color}`);
+      button.addEventListener("click", () => {
+        pad.color = color;
+        container.querySelectorAll(".color-tool").forEach((tool) => {
+          tool.classList.toggle("selected", tool === button);
+        });
+      });
+      container.append(button);
+    });
+
+    const clear = document.createElement("button");
+    clear.className = "clear-tool";
+    clear.type = "button";
+    clear.textContent = "CLR";
+    clear.title = "Clear sketch";
+    clear.addEventListener("click", () => {
+      pad.clear();
+      if (pad === entrySketchPad) saveCurrentEntry();
+    });
+    container.append(clear);
+  });
 }
 
 function buildPromptDialog() {
@@ -1086,8 +1446,12 @@ document.querySelectorAll(".tag-button").forEach((button) => {
 
 buildPromptDialog();
 renderMoodOptions();
+buildSketchTools();
 loadValuesProfile();
 loadGrowthProfile();
+loadCbtProfile();
+loadCompanionProfile();
+loadCompanionExamples();
 loadEntries();
 maybeOpenScheduledValuesPrompt();
 maybeOpenScheduledGrowthPrompt();

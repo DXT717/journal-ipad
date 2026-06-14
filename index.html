@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-title" content="Inner Room" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Inner Room Journal</title>
-    <link rel="manifest" href="manifest.webmanifest?v=13" />
+    <link rel="manifest" href="manifest.webmanifest?v=18" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=13" />
+    <link rel="stylesheet" href="styles.css?v=18" />
   </head>
   <body>
     <main class="app-shell">
@@ -78,6 +78,14 @@
               placeholder="Write freely. The reply will reflect themes, feelings, needs, and one gentle next step."
             ></textarea>
 
+            <div class="sketch-block">
+              <div class="section-head">
+                <span>Sketch</span>
+                <div class="sketch-tools" data-tools-for="entrySketchCanvas"></div>
+              </div>
+              <canvas id="entrySketchCanvas" class="sketch-canvas" width="900" height="360" aria-label="Journal sketch pad"></canvas>
+            </div>
+
             <div class="tag-row" aria-label="Entry tags">
               <button class="tag-button" type="button" data-tag="work">work</button>
               <button class="tag-button" type="button" data-tag="family">family</button>
@@ -94,7 +102,7 @@
                 <p class="eyebrow">Reflective reply</p>
                 <h3>Supportive companion</h3>
               </div>
-              <button class="ghost-button compact" id="replyButton" type="button">Reply</button>
+              <button class="ghost-button compact" id="replyButton" type="button">Send</button>
             </div>
             <div class="reply-body" id="replyBody">
               <p>When you are ready, write a few lines and ask for a reply. I will respond with warmth, reflection, and a grounded question.</p>
@@ -142,6 +150,13 @@
         <div class="values-body">
           <div class="values-card" id="valuesPrompt"></div>
           <textarea id="valuesInput" class="values-input" spellcheck="true"></textarea>
+          <div class="sketch-block compact-sketch">
+            <div class="section-head">
+              <span>Sketch</span>
+              <div class="sketch-tools" data-tools-for="valuesSketchCanvas"></div>
+            </div>
+            <canvas id="valuesSketchCanvas" class="sketch-canvas" width="900" height="300" aria-label="Values sketch pad"></canvas>
+          </div>
           <div class="values-actions">
             <button class="ghost-button" id="weeklyValuesButton" type="button">Weekly</button>
             <button class="ghost-button" id="dailyValuesButton" type="button">Daily</button>
@@ -160,6 +175,13 @@
         <div class="values-body">
           <div class="values-card" id="growthPrompt"></div>
           <textarea id="growthInput" class="values-input" spellcheck="true"></textarea>
+          <div class="sketch-block compact-sketch">
+            <div class="section-head">
+              <span>Sketch</span>
+              <div class="sketch-tools" data-tools-for="growthSketchCanvas"></div>
+            </div>
+            <canvas id="growthSketchCanvas" class="sketch-canvas" width="900" height="300" aria-label="Growth sketch pad"></canvas>
+          </div>
           <div class="values-actions">
             <button class="ghost-button" id="monthlyGrowthButton" type="button">Report</button>
             <button class="ghost-button" id="dailyGrowthButton" type="button">Daily</button>
@@ -178,6 +200,13 @@
         <div class="values-body">
           <div class="values-card" id="cbtPrompt"></div>
           <textarea id="cbtInput" class="values-input" spellcheck="true"></textarea>
+          <div class="sketch-block compact-sketch">
+            <div class="section-head">
+              <span>Sketch</span>
+              <div class="sketch-tools" data-tools-for="cbtSketchCanvas"></div>
+            </div>
+            <canvas id="cbtSketchCanvas" class="sketch-canvas" width="900" height="300" aria-label="CBT sketch pad"></canvas>
+          </div>
           <div class="values-actions single-action">
             <button class="save-button" id="cbtNextButton" type="button">Continue</button>
           </div>
@@ -185,7 +214,7 @@
       </form>
     </dialog>
 
-    <script src="app.js?v=13"></script>
+    <script src="app.js?v=18"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         navigator.serviceWorker.register("sw.js");
