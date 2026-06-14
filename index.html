@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#35695a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Inner Room" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>Inner Room Journal</title>
+    <link rel="manifest" href="manifest.webmanifest?v=4" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icon.svg" />
+    <link rel="stylesheet" href="styles.css?v=4" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="sidebar" aria-label="Journal history">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"></div>
+          <div>
+            <h1>Inner Room</h1>
+            <p>Private reflective journal</p>
+          </div>
+        </div>
+
+        <button class="primary-action" id="newEntryButton" type="button">
+          <span aria-hidden="true">+</span>
+          New entry
+        </button>
+        <button class="secondary-action" id="sidebarPencilButton" type="button">
+          <span aria-hidden="true">P</span>
+          Pencil input
+        </button>
+
+        <div class="history-header">
+          <span>Entries</span>
+          <button class="icon-button" id="exportButton" type="button" title="Export entries" aria-label="Export entries">
+            <span aria-hidden="true">EX</span>
+          </button>
+        </div>
+        <div class="entry-list" id="entryList" role="list"></div>
+      </section>
+
+      <section class="journal-panel" aria-label="Journal editor">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="currentDate"></p>
+            <h2 id="entryTitle">Today</h2>
+          </div>
+          <div class="topbar-actions">
+            <button class="ghost-button" id="pencilButton" type="button">Pencil</button>
+            <button class="ghost-button" id="promptButton" type="button">Prompt</button>
+            <button class="save-button" id="saveButton" type="button">Save</button>
+          </div>
+        </header>
+
+        <div class="editor-layout">
+          <article class="writing-area">
+            <div class="mood-row">
+              <label for="moodRange">Mood</label>
+              <input id="moodRange" type="range" min="1" max="10" value="5" />
+              <output id="moodValue" for="moodRange">5</output>
+            </div>
+
+            <label class="field-label" for="entryText">What is present for you?</label>
+            <textarea
+              id="entryText"
+              spellcheck="true"
+              placeholder="Write freely. The reply will reflect themes, feelings, needs, and one gentle next step."
+            ></textarea>
+
+            <div class="tag-row" aria-label="Entry tags">
+              <button class="tag-button" type="button" data-tag="work">work</button>
+              <button class="tag-button" type="button" data-tag="family">family</button>
+              <button class="tag-button" type="button" data-tag="body">body</button>
+              <button class="tag-button" type="button" data-tag="love">love</button>
+              <button class="tag-button" type="button" data-tag="anxiety">anxiety</button>
+              <button class="tag-button" type="button" data-tag="growth">growth</button>
+            </div>
+          </article>
+
+          <aside class="reflection-panel" aria-label="Reflective reply">
+            <div class="reply-header">
+              <div>
+                <p class="eyebrow">Reflective reply</p>
+                <h3>Supportive companion</h3>
+              </div>
+              <button class="ghost-button compact" id="replyButton" type="button">Reply</button>
+            </div>
+            <div class="reply-body" id="replyBody">
+              <p>When you are ready, write a few lines and ask for a reply. I will respond with warmth, reflection, and a grounded question.</p>
+            </div>
+            <div class="care-note">
+              This app offers supportive reflection, not diagnosis or emergency care. If you might hurt yourself or someone else, contact local emergency services now.
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="promptDialog">
+      <form method="dialog">
+        <div class="dialog-head">
+          <h3>Choose a prompt</h3>
+          <button class="icon-button" value="cancel" aria-label="Close" title="Close">X</button>
+        </div>
+        <div class="prompt-grid" id="promptGrid"></div>
+      </form>
+    </dialog>
+
+    <dialog id="pencilDialog" class="pencil-dialog">
+      <form method="dialog">
+        <div class="dialog-head">
+          <h3>Pencil input</h3>
+          <button class="icon-button" value="cancel" aria-label="Close" title="Close">X</button>
+        </div>
+        <div class="pencil-grid">
+          <section class="pencil-section">
+            <div class="section-head">
+              <label for="pencilText">Handwriting</label>
+              <button class="ghost-button compact" id="insertPencilText" type="button">Insert</button>
+            </div>
+            <textarea id="pencilText" class="pencil-text" spellcheck="true" autocomplete="off" inputmode="text"></textarea>
+          </section>
+
+          <section class="pencil-section">
+            <div class="section-head">
+              <span>Sketch</span>
+              <button class="ghost-button compact" id="clearSketch" type="button">Clear</button>
+            </div>
+            <canvas id="sketchCanvas" width="900" height="520" aria-label="Sketch pad"></canvas>
+          </section>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js?v=4"></script>
+    <script>
+      if ("serviceWorker" in navigator && location.protocol !== "file:") {
+        navigator.serviceWorker.register("sw.js");
+      }
+    </script>
+  </body>
+</html>
