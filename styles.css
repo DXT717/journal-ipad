@@ -191,6 +191,28 @@ h1 {
   padding-right: 3px;
 }
 
+.entry-select-label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+#entrySelect {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 38px 0 11px;
+  color: var(--ink);
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 650;
+  text-transform: none;
+}
+
 .entry-item {
   display: grid;
   gap: 4px;

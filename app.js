@@ -190,6 +190,7 @@ const state = {
 };
 
 const entryList = document.querySelector("#entryList");
+const entrySelect = document.querySelector("#entrySelect");
 const entryText = document.querySelector("#entryText");
 const moodOptions = document.querySelector("#moodOptions");
 const replyBody = document.querySelector("#replyBody");
@@ -264,6 +265,7 @@ function loadValuesProfile() {
     coreValues: [],
     dailyCheckIns: [],
     sketches: {},
+    draft: null,
     lastDailyPromptDate: "",
     lastWeeklyReflectionDate: ""
   };
@@ -271,6 +273,9 @@ function loadValuesProfile() {
   state.valuesProfile.coreValues ||= [];
   state.valuesProfile.dailyCheckIns ||= [];
   state.valuesProfile.sketches ||= {};
+  state.valuesProfile.draft ||= null;
+  state.valuesProfile.pendingDailyAnswer ||= "";
+  state.valuesProfile.pendingDailySketch ||= "";
   state.valuesProfile.lastDailyPromptDate ||= "";
   state.valuesProfile.lastWeeklyReflectionDate ||= "";
 }
@@ -279,20 +284,50 @@ function saveValuesProfile() {
   localStorage.setItem(VALUES_KEY, JSON.stringify(state.valuesProfile));
 }
 
+function valuesDraftKey() {
+  return `${state.valuesMode}:${state.valuesMode === "onboarding" ? state.valuesStep : ""}`;
+}
+
+function saveValuesDraft() {
+  if (valuesInput.hidden) return;
+  state.valuesProfile.draft = {
+    key: valuesDraftKey(),
+    text: valuesInput.value,
+    sketch: valuesSketchPad.data()
+  };
+  saveValuesProfile();
+}
+
 function loadGrowthProfile() {
   const raw = localStorage.getItem(GROWTH_KEY);
   state.growthProfile = raw ? JSON.parse(raw) : {
     entries: [],
+    draft: null,
     lastDailyPromptDate: "",
     lastMonthlyReportMonth: ""
   };
   state.growthProfile.entries ||= [];
+  state.growthProfile.draft ||= null;
   state.growthProfile.lastDailyPromptDate ||= "";
   state.growthProfile.lastMonthlyReportMonth ||= "";
 }
 
 function saveGrowthProfile() {
   localStorage.setItem(GROWTH_KEY, JSON.stringify(state.growthProfile));
+}
+
+function growthDraftKey() {
+  return `${state.growthMode}:${state.growthStep}`;
+}
+
+function saveGrowthDraft() {
+  if (growthInput.hidden) return;
+  state.growthProfile.draft = {
+    key: growthDraftKey(),
+    text: growthInput.value,
+    sketch: growthSketchPad.data()
+  };
+  saveGrowthProfile();
 }
 
 function loadCbtProfile() {
@@ -471,6 +506,7 @@ function saveCurrentEntry() {
 
 function renderList() {
   entryList.innerHTML = "";
+  entrySelect.innerHTML = "";
   state.entries.forEach((entry) => {
     const button = document.createElement("button");
     button.className = `entry-item${entry.id === state.currentId ? " active" : ""}`;
@@ -493,7 +529,21 @@ function renderList() {
 
     button.append(title, meta);
     entryList.append(button);
+
+    const option = document.createElement("option");
+    option.value = entry.id;
+    option.textContent = `${date} — ${title.textContent}`;
+    option.selected = entry.id === state.currentId;
+    entrySelect.append(option);
   });
+}
+
+function openEntry(entryId) {
+  if (!state.entries.some((entry) => entry.id === entryId)) return;
+  saveCurrentEntry();
+  state.currentId = entryId;
+  loadCurrentEntry();
+  renderList();
 }
 
 function renderMoodOptions() {
@@ -838,11 +888,16 @@ function setValuesPrompt(title, lines, buttonText = "Continue", showInput = true
   valuesNextButton.textContent = buttonText;
   dailyValuesButton.hidden = !state.valuesProfile.complete;
   weeklyValuesButton.hidden = !state.valuesProfile.complete;
+  if (showInput && state.valuesProfile.draft?.key === valuesDraftKey()) {
+    valuesInput.value = state.valuesProfile.draft.text || "";
+    valuesSketchPad.load(state.valuesProfile.draft.sketch);
+  }
 }
 
 function openValuesOnboarding() {
   state.valuesMode = "onboarding";
-  state.valuesStep = 0;
+  const savedStep = state.valuesProfile.draft?.key?.match(/^onboarding:(\d+)$/);
+  state.valuesStep = savedStep ? Number(savedStep[1]) : 0;
   renderValuesOnboarding();
   valuesDialog.showModal();
   valuesInput.focus();
@@ -860,6 +915,8 @@ function continueValuesOnboarding() {
   const area = valueAreas[state.valuesStep];
   state.valuesProfile.answers[area.key] = valuesInput.value.trim();
   state.valuesProfile.sketches[area.key] = valuesSketchPad.data();
+  state.valuesProfile.draft = null;
+  saveValuesProfile();
   state.valuesStep += 1;
 
   if (state.valuesStep < valueAreas.length) {
@@ -879,14 +936,24 @@ function continueValuesOnboarding() {
 }
 
 function openDailyValuesCheckIn() {
-  state.valuesMode = "daily-1";
+  state.valuesMode = state.valuesProfile.draft?.key?.startsWith("daily-2") ? "daily-2" : "daily-1";
   state.valuesProfile.lastDailyPromptDate = todayKey();
   saveValuesProfile();
   const values = state.valuesProfile.coreValues.join(", ");
-  setValuesPrompt("Daily values check-in", [
-    `Your core values are: ${values}.`,
-    "Looking at today, which of your values did you honour — and which did you neglect?"
-  ]);
+  if (state.valuesMode === "daily-2") {
+    state.pendingDailyAnswer = state.valuesProfile.pendingDailyAnswer || "";
+    state.pendingDailySketch = state.valuesProfile.pendingDailySketch || "";
+    const neglected = mostNeglectedValue(state.pendingDailyAnswer);
+    setValuesPrompt("Daily values check-in", [
+      `It sounds like ${neglected} may need a little more room.`,
+      `What is one small thing you could do tomorrow to live closer to ${neglected}?`
+    ], "Finish");
+  } else {
+    setValuesPrompt("Daily values check-in", [
+      `Your core values are: ${values}.`,
+      "Looking at today, which of your values did you honour — and which did you neglect?"
+    ]);
+  }
   valuesDialog.showModal();
   valuesInput.focus();
 }
@@ -895,6 +962,10 @@ function continueDailyValuesCheckIn() {
   if (state.valuesMode === "daily-1") {
     state.pendingDailyAnswer = valuesInput.value.trim();
     state.pendingDailySketch = valuesSketchPad.data();
+    state.valuesProfile.pendingDailyAnswer = state.pendingDailyAnswer;
+    state.valuesProfile.pendingDailySketch = state.pendingDailySketch;
+    state.valuesProfile.draft = null;
+    saveValuesProfile();
     const neglected = mostNeglectedValue(state.pendingDailyAnswer);
     state.valuesMode = "daily-2";
     setValuesPrompt("Daily values check-in", [
@@ -915,6 +986,9 @@ function continueDailyValuesCheckIn() {
     nextActionSketch: valuesSketchPad.data(),
     neglected
   });
+  state.valuesProfile.draft = null;
+  state.valuesProfile.pendingDailyAnswer = "";
+  state.valuesProfile.pendingDailySketch = "";
   saveValuesProfile();
   setValuesPrompt("Daily values check-in", [
     "You noticed something real today, and that self-awareness is already a meaningful act of care."
@@ -1005,6 +1079,10 @@ function setGrowthPrompt(title, lines, buttonText = "Continue", showInput = true
   growthSketchPad.clear();
   document.querySelector("#growthSketchCanvas").closest(".sketch-block").hidden = !showInput;
   growthNextButton.textContent = buttonText;
+  if (showInput && state.growthProfile.draft?.key === growthDraftKey()) {
+    growthInput.value = state.growthProfile.draft.text || "";
+    growthSketchPad.load(state.growthProfile.draft.sketch);
+  }
 }
 
 function openGrowthHome() {
@@ -1018,8 +1096,9 @@ function openGrowthHome() {
 
 function openDailyGrowthReflection() {
   state.growthMode = "daily";
-  state.growthStep = 0;
-  state.growthDraft = {};
+  const savedStep = state.growthProfile.draft?.key?.match(/^daily:(\d+)$/);
+  state.growthStep = savedStep ? Number(savedStep[1]) : 0;
+  state.growthDraft = state.growthProfile.activeDraft || {};
   state.growthProfile.lastDailyPromptDate = todayKey();
   saveGrowthProfile();
   renderDailyGrowthStep();
@@ -1051,6 +1130,9 @@ function continueDailyGrowthReflection() {
   if (state.growthStep === 0) {
     state.growthDraft.struggle = answer;
     state.growthDraft.struggleSketch = growthSketchPad.data();
+    state.growthProfile.activeDraft = state.growthDraft;
+    state.growthProfile.draft = null;
+    saveGrowthProfile();
     state.growthStep = 1;
     renderDailyGrowthStep();
     growthInput.focus();
@@ -1059,6 +1141,9 @@ function continueDailyGrowthReflection() {
   if (state.growthStep === 1) {
     state.growthDraft.learning = answer;
     state.growthDraft.learningSketch = growthSketchPad.data();
+    state.growthProfile.activeDraft = state.growthDraft;
+    state.growthProfile.draft = null;
+    saveGrowthProfile();
     state.growthStep = 2;
     renderDailyGrowthStep();
     growthInput.focus();
@@ -1080,6 +1165,8 @@ function continueDailyGrowthReflection() {
     }
   };
   state.growthProfile.entries.push(entry);
+  state.growthProfile.draft = null;
+  state.growthProfile.activeDraft = {};
   saveGrowthProfile();
   state.growthMode = "summary";
   setGrowthPrompt("Growth mindset", [
@@ -1390,6 +1477,8 @@ function createSketchPad(canvas) {
       pad.drawing = false;
       pad.point = null;
       if (canvas.id === "entrySketchCanvas") saveCurrentEntry();
+      if (canvas.id === "valuesSketchCanvas") saveValuesDraft();
+      if (canvas.id === "growthSketchCanvas") saveGrowthDraft();
     });
   });
 
@@ -1449,6 +1538,8 @@ function buildSketchTools() {
     clear.addEventListener("click", () => {
       pad.clear();
       if (pad === entrySketchPad) saveCurrentEntry();
+      if (pad === valuesSketchPad) saveValuesDraft();
+      if (pad === growthSketchPad) saveGrowthDraft();
     });
     container.append(clear);
   });
@@ -1557,6 +1648,7 @@ document.querySelector("#newEntryButton").addEventListener("click", () => {
   createEntry();
   entryText.focus();
 });
+entrySelect.addEventListener("change", () => openEntry(entrySelect.value));
 
 document.querySelector("#saveButton").addEventListener("click", saveCurrentEntry);
 document.querySelector("#refreshButton").addEventListener("click", () => {
@@ -1597,6 +1689,8 @@ entryText.addEventListener("input", () => {
   if (!entry) return;
   entryTitle.textContent = entryText.value.trim().split(/\s+/).slice(0, 5).join(" ") || "Today";
 });
+valuesInput.addEventListener("input", saveValuesDraft);
+growthInput.addEventListener("input", saveGrowthDraft);
 
 document.querySelectorAll(".tag-button").forEach((button) => {
   button.addEventListener("click", () => {
@@ -1622,7 +1716,6 @@ async function startApp() {
   loadCompanionProfile();
   loadCompanionExamples();
   await loadEntries();
-  maybeOpenScheduledValuesPrompt();
   maybeOpenScheduledGrowthPrompt();
 }
 
