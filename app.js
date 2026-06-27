@@ -186,7 +186,8 @@ const state = {
   cbtDraft: {},
   cbtProfile: null,
   companionProfile: null,
-  pendingDailySketch: ""
+  pendingDailySketch: "",
+  memoryEntryId: null
 };
 
 const entryList = document.querySelector("#entryList");
@@ -224,6 +225,11 @@ const patternCheckGrid = document.querySelector("#patternCheckGrid");
 const patternCheckResult = document.querySelector("#patternCheckResult");
 const openingPromptCategory = document.querySelector("#openingPromptCategory");
 const openingPromptText = document.querySelector("#openingPromptText");
+const streakCount = document.querySelector("#streakCount");
+const streakDetail = document.querySelector("#streakDetail");
+const memoryText = document.querySelector("#memoryText");
+const openMemoryButton = document.querySelector("#openMemoryButton");
+const petMessage = document.querySelector("#petMessage");
 const entrySketchPad = createSketchPad(document.querySelector("#entrySketchCanvas"));
 const valuesSketchPad = createSketchPad(document.querySelector("#valuesSketchCanvas"));
 const growthSketchPad = createSketchPad(document.querySelector("#growthSketchCanvas"));
@@ -536,6 +542,7 @@ function renderList() {
     option.selected = entry.id === state.currentId;
     entrySelect.append(option);
   });
+  updateHabitBand();
 }
 
 function openEntry(entryId) {
@@ -544,6 +551,120 @@ function openEntry(entryId) {
   state.currentId = entryId;
   loadCurrentEntry();
   renderList();
+}
+
+function localDayKey(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function shiftDay(date, amount) {
+  const shifted = new Date(date);
+  shifted.setHours(12, 0, 0, 0);
+  shifted.setDate(shifted.getDate() + amount);
+  return shifted;
+}
+
+function journaledEntries() {
+  return state.entries.filter((entry) => entry.text?.trim() || entry.sketch);
+}
+
+function calculateForgivingStreak() {
+  const entries = journaledEntries();
+  if (!entries.length) return { days: 0, freezesLeft: 2, freezesUsed: 0 };
+
+  const journalDays = new Set(entries.map((entry) => localDayKey(entry.createdAt)));
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  let cursor = today;
+  let days = 0;
+  let freezesInWindow = 0;
+  let firstWindowFreezes = 0;
+  let windowDays = 0;
+  let foundJournal = false;
+
+  for (let index = 0; index < 366; index += 1) {
+    const hasJournal = journalDays.has(localDayKey(cursor));
+    if (hasJournal) {
+      foundJournal = true;
+      days += 1;
+    } else if (freezesInWindow < 2) {
+      freezesInWindow += 1;
+      if (index < 7) firstWindowFreezes += 1;
+      days += 1;
+    } else {
+      break;
+    }
+
+    windowDays += 1;
+    if (windowDays === 7) {
+      windowDays = 0;
+      freezesInWindow = 0;
+    }
+    cursor = shiftDay(cursor, -1);
+  }
+
+  if (!foundJournal) return { days: 0, freezesLeft: 2, freezesUsed: 0 };
+  return {
+    days,
+    freezesUsed: firstWindowFreezes,
+    freezesLeft: Math.max(0, 2 - firstWindowFreezes)
+  };
+}
+
+function findJournalMemory() {
+  const entries = journaledEntries().filter((entry) => entry.id !== state.currentId);
+  if (!entries.length) return null;
+
+  const today = new Date();
+  const targets = [
+    { key: localDayKey(shiftDay(today, -30)), label: "About a month ago" },
+    { key: localDayKey(shiftDay(today, -7)), label: "About a week ago" }
+  ];
+
+  for (const target of targets) {
+    const match = entries.find((entry) => localDayKey(entry.createdAt) === target.key);
+    if (match) return { entry: match, label: target.label };
+  }
+
+  const older = entries
+    .filter((entry) => new Date(entry.createdAt) <= shiftDay(today, -6))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return older.length ? { entry: older[0], label: "From an earlier page" } : null;
+}
+
+function updateHabitBand() {
+  const streak = calculateForgivingStreak();
+  streakCount.textContent = `${streak.days} ${streak.days === 1 ? "day" : "days"}`;
+  streakDetail.textContent = streak.days
+    ? `${streak.freezesLeft} freeze ${streak.freezesLeft === 1 ? "day" : "days"} left in this seven-day window.`
+    : "Write when you are ready; two freeze days protect each week.";
+
+  const memory = findJournalMemory();
+  state.memoryEntryId = memory?.entry.id || null;
+  if (memory) {
+    const source = memory.entry.text?.trim() || "A page with a sketch";
+    const snippet = source.length > 150 ? `${source.slice(0, 147)}...` : source;
+    memoryText.textContent = `${memory.label}: “${snippet}”`;
+    openMemoryButton.hidden = false;
+  } else {
+    memoryText.textContent = "A past entry will appear here after your journal has a little history.";
+    openMemoryButton.hidden = true;
+  }
+
+  const hasToday = journaledEntries().some((entry) => localDayKey(entry.createdAt) === localDayKey(new Date()));
+  if (hasToday) {
+    petMessage.textContent = streak.days >= 7
+      ? "Miso is purring beside a very well-loved stack of pages."
+      : "Miso noticed today’s page and has curled up beside it.";
+  } else if (streak.freezesLeft > 0 && streak.days > 0) {
+    petMessage.textContent = "Miso says a quiet day still belongs in the rhythm.";
+  } else {
+    petMessage.textContent = "Miso is waiting nearby, with no hurry at all.";
+  }
 }
 
 function renderMoodOptions() {
@@ -1649,6 +1770,9 @@ document.querySelector("#newEntryButton").addEventListener("click", () => {
   entryText.focus();
 });
 entrySelect.addEventListener("change", () => openEntry(entrySelect.value));
+openMemoryButton.addEventListener("click", () => {
+  if (state.memoryEntryId) openEntry(state.memoryEntryId);
+});
 
 document.querySelector("#saveButton").addEventListener("click", saveCurrentEntry);
 document.querySelector("#refreshButton").addEventListener("click", () => {

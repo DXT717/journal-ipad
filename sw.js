@@ -1,4 +1,4 @@
-const CACHE_NAME = "inner-room-journal-v24";
+const CACHE_NAME = "inner-room-journal-v25";
 const ASSETS = [
   "./",
   "./index.html",
@@ -9,6 +9,7 @@ const ASSETS = [
   "./training_data.json",
   "./manifest.webmanifest",
   "./icon.svg"
+  ,"./cat-companion.png"
 ];
 
 self.addEventListener("install", (event) => {

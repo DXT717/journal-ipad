@@ -266,6 +266,53 @@ h1 {
   font-weight: 760;
 }
 
+.habit-band {
+  display: grid;
+  grid-template-columns: 0.75fr 1.4fr 1fr;
+  border-bottom: 1px solid var(--line);
+  background: rgba(251, 250, 246, 0.78);
+}
+
+.habit-section {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  min-height: 128px;
+  padding: 16px 18px;
+}
+
+.habit-section + .habit-section {
+  border-left: 1px solid var(--line);
+}
+
+.streak-section strong {
+  font-size: 1.55rem;
+  line-height: 1.1;
+}
+
+.habit-section p {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.memory-section button {
+  justify-self: start;
+  margin-top: 2px;
+}
+
+.pet-section {
+  grid-template-columns: 82px minmax(0, 1fr);
+  align-items: center;
+}
+
+.pet-section img {
+  width: 82px;
+  height: 82px;
+  object-fit: cover;
+  border-radius: 8px;
+  mix-blend-mode: multiply;
+}
+
 .editor-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(310px, 0.75fr);
@@ -731,6 +778,16 @@ dialog::backdrop {
     border-top: 1px solid var(--line);
   }
 
+  .habit-band {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .pet-section {
+    grid-column: 1 / -1;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
   textarea {
     min-height: 330px;
   }
@@ -759,6 +816,17 @@ dialog::backdrop {
   .opening-prompt-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
+  }
+
+  .habit-band {
+    grid-template-columns: 1fr;
+  }
+
+  .habit-section + .habit-section,
+  .pet-section {
+    grid-column: auto;
+    border-left: 0;
+    border-top: 1px solid var(--line);
   }
 
   .topbar-actions {
