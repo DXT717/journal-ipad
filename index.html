@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-title" content="Inner Room" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Inner Room Journal</title>
-    <link rel="manifest" href="manifest.webmanifest?v=25" />
+    <link rel="manifest" href="manifest.webmanifest?v=26" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=25" />
+    <link rel="stylesheet" href="styles.css?v=26" />
   </head>
   <body>
     <main class="app-shell">
@@ -137,24 +137,11 @@
             </div>
           </article>
 
-          <aside class="reflection-panel" aria-label="Reflective reply">
-            <div class="reply-header">
-              <div>
-                <p class="eyebrow">Reflective reply</p>
-                <h3>Supportive companion</h3>
-              </div>
-              <button class="ghost-button compact" id="replyButton" type="button">Send</button>
-            </div>
-            <div class="reply-body" id="replyBody">
-              <p>When you are ready, write a few lines and ask for a reply. I will respond with warmth, reflection, and a grounded question.</p>
-            </div>
-            <div class="care-note">
-              This app offers supportive reflection, not diagnosis or emergency care. If you might hurt yourself or someone else, contact local emergency services now.
-            </div>
-          </aside>
         </div>
       </section>
     </main>
+
+    <button class="reply-fab" id="replyButton" type="button">Reply</button>
 
     <dialog id="promptDialog">
       <form method="dialog">
@@ -272,8 +259,28 @@
       </form>
     </dialog>
 
-    <script src="prompt_bank.js?v=25"></script>
-    <script src="app.js?v=25"></script>
+    <dialog id="replyDialog" class="reply-dialog">
+      <form method="dialog">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">Reflective reply</p>
+            <h3>Supportive companion</h3>
+          </div>
+          <button class="icon-button" value="cancel" aria-label="Close" title="Close">X</button>
+        </div>
+        <div class="reply-dialog-body">
+          <div class="reply-body" id="replyBody">
+            <p>Write a few lines, then tap Reply.</p>
+          </div>
+          <div class="care-note">
+            This app offers supportive reflection, not diagnosis or emergency care. If you might hurt yourself or someone else, contact local emergency services now.
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="prompt_bank.js?v=26"></script>
+    <script src="app.js?v=26"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         navigator.serviceWorker.register("sw.js");

@@ -195,6 +195,7 @@ const entrySelect = document.querySelector("#entrySelect");
 const entryText = document.querySelector("#entryText");
 const moodOptions = document.querySelector("#moodOptions");
 const replyBody = document.querySelector("#replyBody");
+const replyDialog = document.querySelector("#replyDialog");
 const currentDate = document.querySelector("#currentDate");
 const entryTitle = document.querySelector("#entryTitle");
 const promptDialog = document.querySelector("#promptDialog");
@@ -1521,6 +1522,11 @@ function generateReply() {
   renderList();
 }
 
+function openReplyDialog() {
+  generateReply();
+  if (!replyDialog.open) replyDialog.showModal();
+}
+
 function exportEntries() {
   saveCurrentEntry();
   const content = JSON.stringify(state.entries, null, 2);
@@ -1779,7 +1785,7 @@ document.querySelector("#refreshButton").addEventListener("click", () => {
   saveCurrentEntry();
   location.reload();
 });
-document.querySelector("#replyButton").addEventListener("click", generateReply);
+document.querySelector("#replyButton").addEventListener("click", openReplyDialog);
 document.querySelector("#exportButton").addEventListener("click", exportEntries);
 document.querySelector("#promptButton").addEventListener("click", () => promptDialog.showModal());
 document.querySelector("#deleteButton").addEventListener("click", openDeleteDialog);

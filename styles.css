@@ -315,7 +315,7 @@ h1 {
 
 .editor-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(310px, 0.75fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
   min-height: 0;
   flex: 1;
@@ -480,17 +480,6 @@ button:focus-visible {
   border-color: var(--blue);
 }
 
-.reflection-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  padding: 24px;
-  border-left: 1px solid var(--line);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(247, 250, 248, 0.94)),
-    repeating-linear-gradient(135deg, rgba(110, 143, 127, 0.08) 0 1px, transparent 1px 14px);
-}
-
 .reply-header {
   display: flex;
   justify-content: space-between;
@@ -525,6 +514,38 @@ button:focus-visible {
   border-radius: 8px;
   font-size: 0.88rem;
   line-height: 1.45;
+}
+
+.reply-fab {
+  position: fixed;
+  right: max(22px, env(safe-area-inset-right));
+  bottom: max(22px, env(safe-area-inset-bottom));
+  z-index: 20;
+  min-width: 92px;
+  min-height: 52px;
+  padding: 0 20px;
+  color: #ffffff;
+  background: var(--sage-dark);
+  border: 1px solid var(--sage-dark);
+  border-radius: 8px;
+  box-shadow: 0 14px 30px rgba(32, 36, 43, 0.24);
+  font-weight: 800;
+}
+
+.reply-dialog {
+  width: min(620px, calc(100vw - 32px));
+}
+
+.reply-dialog-body {
+  display: grid;
+  gap: 14px;
+  max-height: min(70vh, 680px);
+  padding: 18px;
+  overflow: auto;
+}
+
+.reply-dialog .care-note {
+  margin-top: 0;
 }
 
 dialog {
@@ -771,11 +792,6 @@ dialog::backdrop {
 
   .editor-layout {
     grid-template-columns: 1fr;
-  }
-
-  .reflection-panel {
-    border-left: 0;
-    border-top: 1px solid var(--line);
   }
 
   .habit-band {
