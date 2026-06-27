@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-title" content="Inner Room" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Inner Room Journal</title>
-    <link rel="manifest" href="manifest.webmanifest?v=18" />
+    <link rel="manifest" href="manifest.webmanifest?v=22" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=18" />
+    <link rel="stylesheet" href="styles.css?v=22" />
   </head>
   <body>
     <main class="app-shell">
@@ -39,6 +39,10 @@
         <button class="secondary-action" id="cbtButton" type="button">
           <span aria-hidden="true">C</span>
           CBT record
+        </button>
+        <button class="secondary-action" id="patternCheckButton" type="button">
+          <span aria-hidden="true">PC</span>
+          Pattern check
         </button>
 
         <div class="history-header">
@@ -69,6 +73,19 @@
             <div class="mood-picker" aria-labelledby="moodPickerLabel">
               <div class="field-label" id="moodPickerLabel">Mood</div>
               <div class="mood-quadrants" id="moodOptions" role="listbox" aria-label="Choose a mood"></div>
+            </div>
+
+            <div class="opening-prompt">
+              <div class="opening-prompt-head">
+                <div>
+                  <span class="eyebrow" id="openingPromptCategory">Opening prompt</span>
+                  <p id="openingPromptText"></p>
+                </div>
+                <div class="opening-prompt-actions">
+                  <button class="ghost-button compact" id="anotherOpeningPromptButton" type="button">Another</button>
+                  <button class="save-button compact" id="useOpeningPromptButton" type="button">Use</button>
+                </div>
+              </div>
             </div>
 
             <label class="field-label" for="entryText">What is present for you?</label>
@@ -214,7 +231,25 @@
       </form>
     </dialog>
 
-    <script src="app.js?v=18"></script>
+    <dialog id="patternCheckDialog" class="values-dialog">
+      <form method="dialog">
+        <div class="dialog-head">
+          <h3>Self check-in</h3>
+          <button class="icon-button" value="cancel" aria-label="Close" title="Close">X</button>
+        </div>
+        <div class="pattern-check-body">
+          <div class="pattern-check-grid" id="patternCheckGrid"></div>
+          <div class="values-card" id="patternCheckResult" hidden></div>
+          <div class="pattern-check-actions">
+            <button class="ghost-button" id="resetPatternCheckButton" type="button">Reset</button>
+            <button class="save-button" id="reviewPatternCheckButton" type="button">Review</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="prompt_bank.js?v=22"></script>
+    <script src="app.js?v=22"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         navigator.serviceWorker.register("sw.js");

@@ -1,9 +1,11 @@
-const CACHE_NAME = "inner-room-journal-v18";
+const CACHE_NAME = "inner-room-journal-v22";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./prompt_bank.js",
+  "./prompt_bank.json",
   "./training_data.json",
   "./manifest.webmanifest",
   "./icon.svg"

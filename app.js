@@ -15,6 +15,25 @@ const prompts = [
   "What am I proud of that I almost forgot to count?"
 ];
 
+const patternCheckItems = [
+  { id: "low_mood", group: "mood", label: "Low, flat, or tearful more often than usual" },
+  { id: "irritable", group: "mood", label: "More irritable or easily frustrated" },
+  { id: "worry", group: "worry", label: "Worry that is hard to switch off" },
+  { id: "avoidance", group: "worry", label: "Avoiding things because they feel too much" },
+  { id: "poor_sleep", group: "sleep", label: "Trouble falling asleep or staying asleep" },
+  { id: "oversleeping", group: "sleep", label: "Sleeping much more than usual" },
+  { id: "low_energy", group: "energy", label: "Very low energy or difficulty starting" },
+  { id: "restless", group: "energy", label: "Restless, tense, or unable to slow down" },
+  { id: "disconnected", group: "connection", label: "Pulling away from people or feeling disconnected" },
+  { id: "unsupported", group: "connection", label: "Feeling unseen, unsupported, or alone" },
+  { id: "focus", group: "daily life", label: "Harder to focus, decide, or finish ordinary tasks" },
+  { id: "joy", group: "daily life", label: "Less interest or joy in things that usually matter" },
+  { id: "self_criticism", group: "self-talk", label: "Harsh self-criticism or feeling not good enough" },
+  { id: "body", group: "body", label: "Frequent tension, headaches, stomach discomfort, or racing heart" },
+  { id: "substances", group: "coping", label: "Using alcohol, food, screens, or other habits to escape more often" },
+  { id: "self_harm", group: "safety", label: "Thoughts of hurting myself or not wanting to be here" }
+];
+
 const valueAreas = [
   {
     key: "relationships",
@@ -195,6 +214,11 @@ const cbtTitle = document.querySelector("#cbtTitle");
 const cbtPrompt = document.querySelector("#cbtPrompt");
 const cbtInput = document.querySelector("#cbtInput");
 const cbtNextButton = document.querySelector("#cbtNextButton");
+const patternCheckDialog = document.querySelector("#patternCheckDialog");
+const patternCheckGrid = document.querySelector("#patternCheckGrid");
+const patternCheckResult = document.querySelector("#patternCheckResult");
+const openingPromptCategory = document.querySelector("#openingPromptCategory");
+const openingPromptText = document.querySelector("#openingPromptText");
 const entrySketchPad = createSketchPad(document.querySelector("#entrySketchCanvas"));
 const valuesSketchPad = createSketchPad(document.querySelector("#valuesSketchCanvas"));
 const growthSketchPad = createSketchPad(document.querySelector("#growthSketchCanvas"));
@@ -264,13 +288,11 @@ function saveCbtProfile() {
 
 function loadCompanionProfile() {
   const raw = localStorage.getItem(COMPANION_KEY);
-  state.companionProfile = raw ? JSON.parse(raw) : { askedQuestions: [], facts: [], values: [], patterns: [], moodTrend: [], important: [] };
-  state.companionProfile.askedQuestions ||= [];
-  state.companionProfile.facts ||= [];
-  state.companionProfile.values ||= [];
-  state.companionProfile.patterns ||= [];
-  state.companionProfile.moodTrend ||= [];
-  state.companionProfile.important ||= [];
+  const previous = raw ? JSON.parse(raw) : {};
+  state.companionProfile = {
+    askedQuestions: previous.askedQuestions || []
+  };
+  saveCompanionProfile();
 }
 
 function saveCompanionProfile() {
@@ -643,40 +665,6 @@ function recurringPattern(entry, context) {
   if (need && countMatches(recent, needLexicon[need]) > 1) {
     return `There may be a repeated pull toward ${need} showing up across your recent entries.`;
   }
-  return "";
-}
-
-function updateCompanionMemory(entry) {
-  const text = entry.text.toLowerCase();
-  const profile = state.companionProfile;
-  const factPatterns = [
-    /\bmy (mom|mother|dad|father|partner|boyfriend|girlfriend|husband|wife|friend|boss|manager|coworker|colleague|sister|brother)\b[^.!?]{0,90}/gi,
-    /\bi (work|worked|study|studied|live|lived|moved|commute|teach|manage|care for)\b[^.!?]{0,90}/gi
-  ];
-  factPatterns.forEach((pattern) => {
-    (entry.text.match(pattern) || []).slice(0, 2).forEach((match) => profile.facts.push(match.trim()));
-  });
-  Object.keys(valueWords).forEach((value) => {
-    if (countMatches(text, valueWords[value]) > 0) profile.values.push(value);
-  });
-  profile.patterns.push(inferCompanionSignal(text));
-  profile.moodTrend.push(moodFromKey(entry.moodKey).label);
-  const important = sentenceFromEntry(entry.text);
-  if (important) profile.important.push(important.replace(/^One line stands out to me: "/, "").replace(/\."$/, ""));
-  profile.facts = [...new Set(profile.facts)].slice(-30);
-  profile.values = [...new Set(profile.values)].slice(-12);
-  profile.patterns = profile.patterns.slice(-20);
-  profile.moodTrend = profile.moodTrend.slice(-10);
-  profile.important = profile.important.slice(-10);
-  saveCompanionProfile();
-}
-
-function memoryNudge() {
-  const profile = state.companionProfile;
-  const fact = profile.facts?.slice(-1)[0];
-  const important = profile.important?.slice(-1)[0];
-  if (fact && profile.facts.length % 3 === 0) return `Also, the bit about ${fact} feels connected to things you've mentioned before.`;
-  if (important && profile.important.length % 4 === 0) return `That line about "${important}" feels like it has a little bell around it.`;
   return "";
 }
 
@@ -1224,14 +1212,11 @@ function buildSupportiveReflection(entry) {
     thought: "One thought in here got very loud, like it climbed onto a chair and shouted over everything else.",
     feeling: "The feeling has a shape, almost like it started as one tiny pebble and then became a whole hill."
   };
-  const memory = memoryNudge();
   const question = curiousQuestion(entry, signal);
-  updateCompanionMemory(entry);
 
   return [
     emotionLines[mainEmotion],
     secondLines[signal],
-    memory,
     question
   ].filter(Boolean).slice(0, 3).join("\n\n");
 }
@@ -1269,6 +1254,7 @@ function createSketchPad(canvas) {
     canvas,
     context,
     color: sketchColors[0],
+    erasing: false,
     drawing: false,
     point: null,
     clear() {
@@ -1314,7 +1300,8 @@ function createSketchPad(canvas) {
   canvas.addEventListener("pointermove", (event) => {
     if (!pad.drawing || !pad.point) return;
     const point = pad.eventPoint(event);
-    context.strokeStyle = pad.color;
+    context.strokeStyle = pad.erasing ? "#ffffff" : pad.color;
+    context.lineWidth = pad.erasing ? 28 : 5;
     context.beginPath();
     context.moveTo(pad.point.x, pad.point.y);
     context.lineTo(point.x, point.y);
@@ -1355,12 +1342,27 @@ function buildSketchTools() {
       button.setAttribute("aria-label", `Pen color ${color}`);
       button.addEventListener("click", () => {
         pad.color = color;
+        pad.erasing = false;
         container.querySelectorAll(".color-tool").forEach((tool) => {
           tool.classList.toggle("selected", tool === button);
         });
+        container.querySelector(".eraser-tool")?.classList.remove("selected");
       });
       container.append(button);
     });
+
+    const eraser = document.createElement("button");
+    eraser.className = "eraser-tool";
+    eraser.type = "button";
+    eraser.textContent = "ERS";
+    eraser.title = "Eraser";
+    eraser.setAttribute("aria-label", "Eraser");
+    eraser.addEventListener("click", () => {
+      pad.erasing = true;
+      container.querySelectorAll(".color-tool").forEach((tool) => tool.classList.remove("selected"));
+      eraser.classList.add("selected");
+    });
+    container.append(eraser);
 
     const clear = document.createElement("button");
     clear.className = "clear-tool";
@@ -1391,6 +1393,88 @@ function buildPromptDialog() {
   });
 }
 
+function chooseOpeningPrompt() {
+  const bank = window.JOURNAL_PROMPTS || [];
+  if (!bank.length) return;
+
+  const lastId = Number(localStorage.getItem("inner-room-last-prompt-id") || 0);
+  const available = bank.filter((item) => item.id !== lastId);
+  const source = available.length ? available : bank;
+  state.openingPrompt = source[Math.floor(Math.random() * source.length)];
+  localStorage.setItem("inner-room-last-prompt-id", String(state.openingPrompt.id));
+  renderOpeningPrompt();
+}
+
+function renderOpeningPrompt() {
+  if (!state.openingPrompt) return;
+  openingPromptCategory.textContent = `${state.openingPrompt.category} · ${state.openingPrompt.id}/300`;
+  openingPromptText.textContent = state.openingPrompt.text;
+}
+
+function useOpeningPrompt() {
+  if (!state.openingPrompt) return;
+  const prompt = state.openingPrompt.text;
+  entryText.value = entryText.value ? `${entryText.value.trim()}\n\n${prompt}\n` : `${prompt}\n`;
+  entryText.focus();
+}
+
+function buildPatternCheck() {
+  patternCheckGrid.innerHTML = "";
+  patternCheckItems.forEach((item) => {
+    const label = document.createElement("label");
+    label.className = "pattern-check-item";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = item.id;
+    checkbox.dataset.group = item.group;
+
+    const text = document.createElement("span");
+    text.textContent = item.label;
+
+    label.append(checkbox, text);
+    patternCheckGrid.append(label);
+  });
+}
+
+function openPatternCheck() {
+  patternCheckResult.hidden = true;
+  patternCheckDialog.showModal();
+}
+
+function resetPatternCheck() {
+  patternCheckGrid.querySelectorAll("input").forEach((checkbox) => {
+    checkbox.checked = false;
+  });
+  patternCheckResult.hidden = true;
+  patternCheckResult.textContent = "";
+}
+
+function reviewPatternCheck() {
+  const selected = [...patternCheckGrid.querySelectorAll("input:checked")];
+  patternCheckResult.innerHTML = "";
+
+  const lines = [];
+  if (!selected.length) {
+    lines.push("Nothing is checked right now. That can simply mean no listed pattern stands out today.");
+  } else if (selected.some((checkbox) => checkbox.value === "self_harm")) {
+    lines.push("The safety item matters more than the rest of this checklist.");
+    lines.push("Please tell someone you trust or a mental health professional now, and contact emergency services if you might act on these thoughts.");
+  } else {
+    const groups = [...new Set(selected.map((checkbox) => checkbox.dataset.group))];
+    lines.push(`${selected.length} patterns stand out today, especially around ${groups.slice(0, 3).join(", ")}.`);
+    lines.push("This is a snapshot for noticing, not a diagnosis or a score.");
+    lines.push("Which checked item has been affecting ordinary life the most?");
+  }
+
+  lines.forEach((line, index) => {
+    const element = document.createElement(index === 0 ? "strong" : "p");
+    element.textContent = line;
+    patternCheckResult.append(element);
+  });
+  patternCheckResult.hidden = false;
+}
+
 document.querySelector("#newEntryButton").addEventListener("click", () => {
   saveCurrentEntry();
   createEntry();
@@ -1409,6 +1493,7 @@ document.querySelector("#deleteButton").addEventListener("click", openDeleteDial
 document.querySelector("#valuesButton").addEventListener("click", openValuesHome);
 document.querySelector("#growthButton").addEventListener("click", openGrowthHome);
 document.querySelector("#cbtButton").addEventListener("click", openCbtRecord);
+document.querySelector("#patternCheckButton").addEventListener("click", openPatternCheck);
 valuesNextButton.addEventListener("click", continueValuesFlow);
 dailyValuesButton.addEventListener("click", openDailyValuesCheckIn);
 weeklyValuesButton.addEventListener("click", openWeeklyValuesReflection);
@@ -1422,6 +1507,10 @@ cbtNextButton.addEventListener("click", () => {
     cbtDialog.close();
   }
 });
+document.querySelector("#resetPatternCheckButton").addEventListener("click", resetPatternCheck);
+document.querySelector("#reviewPatternCheckButton").addEventListener("click", reviewPatternCheck);
+document.querySelector("#anotherOpeningPromptButton").addEventListener("click", chooseOpeningPrompt);
+document.querySelector("#useOpeningPromptButton").addEventListener("click", useOpeningPrompt);
 document.querySelector("#confirmDeleteButton").addEventListener("click", () => {
   deleteCurrentEntry();
   deleteDialog.close();
@@ -1445,6 +1534,8 @@ document.querySelectorAll(".tag-button").forEach((button) => {
 });
 
 buildPromptDialog();
+buildPatternCheck();
+chooseOpeningPrompt();
 renderMoodOptions();
 buildSketchTools();
 loadValuesProfile();

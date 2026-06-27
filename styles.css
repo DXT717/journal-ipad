@@ -263,6 +263,42 @@ h1 {
   font-weight: 780;
 }
 
+.opening-prompt {
+  padding: 14px 15px;
+  border: 1px solid #d6e0ea;
+  border-left: 4px solid var(--blue);
+  border-radius: 8px;
+  background: #f5f8fb;
+}
+
+.opening-prompt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.opening-prompt-head > div:first-child {
+  display: grid;
+  gap: 5px;
+}
+
+#openingPromptText {
+  line-height: 1.45;
+}
+
+.opening-prompt-actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+.opening-prompt-actions button {
+  min-width: 74px;
+  padding: 0 12px;
+  font-weight: 760;
+}
+
 .mood-picker {
   display: grid;
   gap: 10px;
@@ -522,6 +558,54 @@ dialog::backdrop {
   grid-template-columns: 1fr;
 }
 
+.pattern-check-body {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.pattern-check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pattern-check-item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  min-height: 58px;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  line-height: 1.35;
+}
+
+.pattern-check-item:has(input:checked) {
+  background: #eef6f1;
+  border-color: var(--sage);
+}
+
+.pattern-check-item input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--sage-dark);
+}
+
+.pattern-check-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 10px;
+}
+
+.pattern-check-actions button {
+  min-height: 44px;
+  font-weight: 760;
+}
+
 .values-actions button {
   min-height: 44px;
   font-weight: 760;
@@ -553,6 +637,7 @@ dialog::backdrop {
 }
 
 .color-tool,
+.eraser-tool,
 .clear-tool {
   display: grid;
   place-items: center;
@@ -574,6 +659,12 @@ dialog::backdrop {
 .color-tool.selected {
   outline: 3px solid rgba(72, 108, 151, 0.28);
   outline-offset: 2px;
+}
+
+.eraser-tool.selected {
+  color: #ffffff;
+  background: var(--blue);
+  border-color: var(--blue);
 }
 
 .sketch-canvas {
@@ -637,9 +728,15 @@ dialog::backdrop {
   }
 
   .topbar,
-  .reply-header {
+  .reply-header,
+  .opening-prompt-head {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .opening-prompt-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 
   .topbar-actions {
@@ -652,6 +749,11 @@ dialog::backdrop {
   }
 
   .values-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .pattern-check-grid,
+  .pattern-check-actions {
     grid-template-columns: 1fr;
   }
 
