@@ -3,8 +3,12 @@ const VALUES_KEY = "inner-room-values-v1";
 const GROWTH_KEY = "inner-room-growth-v1";
 const CBT_KEY = "inner-room-cbt-v1";
 const COMPANION_KEY = "inner-room-companion-v1";
+const LOCAL_DB_NAME = "inner-room-local-v1";
+const LOCAL_DB_STORE = "journal-state";
+const LOCAL_DB_ENTRY_KEY = "entries";
 const sketchColors = ["#20242b", "#c66a54", "#d5a642", "#35695a", "#486c97", "#7b4fa3"];
 let companionExamples = [];
+let journalWriteQueue = Promise.resolve();
 
 const prompts = [
   "What feeling has been asking for more space today?",
@@ -224,9 +228,23 @@ const valuesSketchPad = createSketchPad(document.querySelector("#valuesSketchCan
 const growthSketchPad = createSketchPad(document.querySelector("#growthSketchCanvas"));
 const cbtSketchPad = createSketchPad(document.querySelector("#cbtSketchCanvas"));
 
-function loadEntries() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  state.entries = raw ? JSON.parse(raw) : [];
+async function loadEntries() {
+  let storedEntries = await readJournalDatabase();
+  let raw = null;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(`${STORAGE_KEY}-backup`);
+  } catch {
+    raw = null;
+  }
+
+  if (!storedEntries?.length && raw) {
+    try {
+      storedEntries = JSON.parse(raw);
+    } catch {
+      storedEntries = null;
+    }
+  }
+  state.entries = Array.isArray(storedEntries) ? storedEntries : [];
   state.entries.forEach(migrateEntryMood);
   if (!state.entries.length) {
     createEntry();
@@ -235,6 +253,7 @@ function loadEntries() {
     loadCurrentEntry();
   }
   renderList();
+  persist();
 }
 
 function loadValuesProfile() {
@@ -310,7 +329,65 @@ async function loadCompanionExamples() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.entries));
+  const serialized = JSON.stringify(state.entries);
+  try {
+    localStorage.setItem(STORAGE_KEY, serialized);
+    localStorage.setItem(`${STORAGE_KEY}-backup`, serialized);
+  } catch {
+    // IndexedDB remains the durable store when localStorage reaches its quota.
+  }
+  writeJournalDatabase(state.entries);
+}
+
+function openJournalDatabase() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      reject(new Error("IndexedDB unavailable"));
+      return;
+    }
+    const request = indexedDB.open(LOCAL_DB_NAME, 1);
+    request.addEventListener("upgradeneeded", () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(LOCAL_DB_STORE)) {
+        database.createObjectStore(LOCAL_DB_STORE);
+      }
+    });
+    request.addEventListener("success", () => resolve(request.result));
+    request.addEventListener("error", () => reject(request.error));
+  });
+}
+
+async function readJournalDatabase() {
+  try {
+    const database = await openJournalDatabase();
+    return await new Promise((resolve, reject) => {
+      const transaction = database.transaction(LOCAL_DB_STORE, "readonly");
+      const request = transaction.objectStore(LOCAL_DB_STORE).get(LOCAL_DB_ENTRY_KEY);
+      request.addEventListener("success", () => resolve(request.result || null));
+      request.addEventListener("error", () => reject(request.error));
+      transaction.addEventListener("complete", () => database.close());
+    });
+  } catch {
+    return null;
+  }
+}
+
+function writeJournalDatabase(entries) {
+  const snapshot = structuredClone(entries);
+  journalWriteQueue = journalWriteQueue
+    .then(async () => {
+      const database = await openJournalDatabase();
+      await new Promise((resolve, reject) => {
+        const transaction = database.transaction(LOCAL_DB_STORE, "readwrite");
+        transaction.objectStore(LOCAL_DB_STORE).put(snapshot, LOCAL_DB_ENTRY_KEY);
+        transaction.addEventListener("complete", resolve);
+        transaction.addEventListener("error", () => reject(transaction.error));
+      });
+      database.close();
+    })
+    .catch(() => {
+      // localStorage remains the fallback for browsers that block IndexedDB.
+    });
 }
 
 function createEntry() {
@@ -1533,16 +1610,20 @@ document.querySelectorAll(".tag-button").forEach((button) => {
   });
 });
 
-buildPromptDialog();
-buildPatternCheck();
-chooseOpeningPrompt();
-renderMoodOptions();
-buildSketchTools();
-loadValuesProfile();
-loadGrowthProfile();
-loadCbtProfile();
-loadCompanionProfile();
-loadCompanionExamples();
-loadEntries();
-maybeOpenScheduledValuesPrompt();
-maybeOpenScheduledGrowthPrompt();
+async function startApp() {
+  buildPromptDialog();
+  buildPatternCheck();
+  chooseOpeningPrompt();
+  renderMoodOptions();
+  buildSketchTools();
+  loadValuesProfile();
+  loadGrowthProfile();
+  loadCbtProfile();
+  loadCompanionProfile();
+  loadCompanionExamples();
+  await loadEntries();
+  maybeOpenScheduledValuesPrompt();
+  maybeOpenScheduledGrowthPrompt();
+}
+
+startApp();
